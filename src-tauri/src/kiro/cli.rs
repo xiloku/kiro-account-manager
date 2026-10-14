@@ -298,8 +298,16 @@ pub fn switch_cli_account(
     // 写入新值
     write_kv_value(&tx, &payload.token_key, &payload.token_value)
         .map_err(|e| format!("写入 token 失败: {e}"))?;
-    write_kv_value(&tx, &payload.device_reg_key, &payload.device_reg_value)
-        .map_err(|e| format!("写入 device registration 失败: {e}"))?;
+    // Social 账号没有自己的 client_id/secret：此时保留 CLI 原有的 device registration，
+    // 不要用空值覆盖掉（覆盖后 CLI 刷新 token 会失败）。
+    let device_reg_empty = serde_json::from_str::<serde_json::Value>(&payload.device_reg_value)
+        .ok()
+        .and_then(|v| v.get("client_id").and_then(|c| c.as_str()).map(|s| s.is_empty()))
+        .unwrap_or(false);
+    if !device_reg_empty {
+        write_kv_value(&tx, &payload.device_reg_key, &payload.device_reg_value)
+            .map_err(|e| format!("写入 device registration 失败: {e}"))?;
+    }
 
     // 清除其他优先级的旧 token key（与 Electron 版本一致）
     let all_token_keys = vec![

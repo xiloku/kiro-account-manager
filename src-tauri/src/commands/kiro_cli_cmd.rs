@@ -659,14 +659,29 @@ fn build_switch_payload(
         };
         token_data["start_url"] = serde_json::json!(start_url);
     } else {
-        // Social token：带 start_url 与 profile_arn
-        token_data["start_url"] = serde_json::json!(DEFAULT_START_URL);
+        // Social token：kiro-cli 2.27+ 只认这 6 个字段，缺 provider / telemetry_generation
+        // 会被当成"未登录"。expires_at 写成已过期，让 CLI 首次使用时用 refresh_token
+        // 换新 access_token，避免拿管理器里可能已过期的旧 access_token 撞 403。
         let profile_arn = account
             .profile_arn
             .as_deref()
             .filter(|s| !s.is_empty())
             .unwrap_or(SOCIAL_PROFILE_ARN);
-        token_data["profile_arn"] = serde_json::json!(profile_arn);
+        let expired = (chrono::Utc::now() - chrono::Duration::minutes(1))
+            .to_rfc3339_opts(chrono::SecondsFormat::Micros, true);
+        let telemetry_generation = format!(
+            "{}{}",
+            uuid::Uuid::new_v4().simple(),
+            uuid::Uuid::new_v4().simple()
+        );
+        token_data = serde_json::json!({
+            "access_token": account.access_token,
+            "expires_at": expired,
+            "refresh_token": account.refresh_token,
+            "telemetry_generation": telemetry_generation,
+            "provider": provider.to_lowercase(),
+            "profile_arn": profile_arn,
+        });
     }
 
     let token_value =
