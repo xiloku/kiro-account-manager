@@ -61,7 +61,7 @@
   },
   "bundle": {
     "active": true,
-    "createUpdaterArtifacts": true,
+    "createUpdaterArtifacts": false,
     "category": "DeveloperTool",
     "copyright": "© 2026 hj01857655",
     "publisher": "Kiro",
